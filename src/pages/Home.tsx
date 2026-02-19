@@ -6,112 +6,58 @@ import { EnergySlider } from '../components/energy/EnergySlider';
 import { TaskCard } from '../components/tasks/TaskCard';
 import { FloatingActionButton } from '../components/ui/FloatingActionButton';
 import { TaskCreationModal } from '../components/tasks/TaskCreationModal';
-import { filterTasksByEnergy } from '../utils/energyAlgo';
 import { Card, CardContent } from '../components/ui/Card';
 import { Loader2 } from 'lucide-react';
+import { useDailyPlan } from '../hooks/useDailyPlan';
+import { EmptyLibrary } from '../components/home/EmptyLibrary';
 
 export default function Home() {
     const { tasks, fetchTasks, isLoading: tasksLoading } = useTaskStore();
     const { todayLog, fetchTodayLog, isLoading: energyLoading } = useEnergyStore();
 
-    const [activeTab, setActiveTab] = useState<'focus' | 'all' | 'history'>('focus');
-    const [dailyPlan, setDailyPlan] = useState<{ date: string, taskIds: string[] } | null>(null);
-    const [shuffleUsed, setShuffleUsed] = useState(false);
+    // UI State
+    const [activeTab, setActiveTab] = useState<'focus' | 'history'>('focus');
     const [historyFilter, setHistoryFilter] = useState<'24h' | '7d' | '30d'>('24h');
     const [isModalOpen, setIsModalOpen] = useState(false);
 
+    // Initial Data Fetch
     useEffect(() => {
         fetchTasks();
         fetchTodayLog();
     }, [fetchTasks, fetchTodayLog]);
 
-    // Load Daily Plan from LocalStorage
-    useEffect(() => {
-        const storedPlan = localStorage.getItem('daily_plan');
-        const storedShuffle = localStorage.getItem('daily_shuffle_used');
-        const todayStr = new Date().toDateString();
-
-        if (storedPlan) {
-            const parsed = JSON.parse(storedPlan);
-            if (parsed.date === todayStr) {
-                setDailyPlan(parsed);
-                if (storedShuffle === todayStr) {
-                    setShuffleUsed(true);
-                }
-                return;
-            }
-        }
-
-        // If no plan or old plan, we wait for energy log to generate one
-    }, []);
-
-    // Generate Plan if Energy Log exists and no plan for today
-    useEffect(() => {
-        if (!todayLog || tasks.length === 0) return;
-
-        const todayStr = new Date().toDateString();
-        // If we already have a plan for today, don't overwrite
-        if (dailyPlan && dailyPlan.date === todayStr) return;
-
-        // Generate Plan
-        const suggested = filterTasksByEnergy(tasks, todayLog.level).slice(0, 5);
-        const newPlan = {
-            date: todayStr,
-            taskIds: suggested.map(t => t.id)
-        };
-
-        localStorage.setItem('daily_plan', JSON.stringify(newPlan));
-        // Reset shuffle for new day
-        localStorage.removeItem('daily_shuffle_used');
-        setDailyPlan(newPlan);
-        setShuffleUsed(false);
-
-    }, [todayLog, tasks, dailyPlan]);
-
-    const handleShuffle = () => {
-        if (!todayLog || shuffleUsed) return;
-
-        // Simple shuffle: filter again, maybe slice differently or just randomize order of top 10 and pick 5
-        // For MVP: just re-run filter and maybe randomize the top 10
-        const candidates = filterTasksByEnergy(tasks, todayLog.level).slice(0, 10);
-        // Fisher-Yates shuffle
-        for (let i = candidates.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
-        }
-        const newSelection = candidates.slice(0, 5);
-
-        const newPlan = {
-            date: new Date().toDateString(),
-            taskIds: newSelection.map(t => t.id)
-        };
-
-        localStorage.setItem('daily_plan', JSON.stringify(newPlan));
-        localStorage.setItem('daily_shuffle_used', new Date().toDateString());
-        setDailyPlan(newPlan);
-        setShuffleUsed(true);
-    };
+    // Daily Plan Logic Hook
+    const { dailyPlan, shuffleUsed, handleShuffle } = useDailyPlan(tasks, todayLog);
 
     const isLoading = tasksLoading || energyLoading;
 
     // Derived Lists
     const focusTasks = dailyPlan
-        ? tasks.filter(t => dailyPlan.taskIds.includes(t.id))
-            // Maintain order from plan if possible, or just list. 
-            // To maintain order we can sort by index in taskIds
-            .sort((a, b) => dailyPlan.taskIds.indexOf(a.id) - dailyPlan.taskIds.indexOf(b.id))
+        ? tasks.filter(t => dailyPlan.dailyIds.includes(t.id) || dailyPlan.suggestedIds.includes(t.id))
+            // Sort: Daily first, then Suggested (in order)
+            .sort((a, b) => {
+                const isADaily = dailyPlan.dailyIds.includes(a.id);
+                const isBDaily = dailyPlan.dailyIds.includes(b.id);
+                if (isADaily && !isBDaily) return -1;
+                if (!isADaily && isBDaily) return 1;
+
+                // If both suggested, use order in suggestedIds
+                if (!isADaily && !isBDaily) {
+                    return dailyPlan.suggestedIds.indexOf(a.id) - dailyPlan.suggestedIds.indexOf(b.id);
+                }
+                return 0; // Both daily, keep existing order (or sort by priority?)
+            })
         : [];
 
-    // If some tasks in plan were deleted, they won't show. That's fine.
-
-    const allActiveTasks = tasks.filter(t => !t.is_completed);
+    // Split for rendering headers
+    const dailyRoutineTasks = focusTasks.filter(t => dailyPlan?.dailyIds.includes(t.id));
+    const suggestedFocusTasks = focusTasks.filter(t => dailyPlan?.suggestedIds.includes(t.id));
 
     const historyTasks = tasks.filter(t => {
         if (!t.is_completed || !t.completed_at) return false;
         const completedDate = new Date(t.completed_at);
         const now = new Date();
-        const diffMs = now.getTime() - completedDate.getTime();
-        const diffHours = diffMs / (1000 * 60 * 60);
+        const diffHours = (now.getTime() - completedDate.getTime()) / (1000 * 60 * 60);
         const diffDays = diffHours / 24;
 
         if (historyFilter === '24h') return diffHours <= 24;
@@ -129,7 +75,7 @@ export default function Home() {
 
             {/* Top Tabs */}
             <div className="flex p-1 bg-muted/10 rounded-lg w-full">
-                {['focus', 'all', 'history'].map((tab) => (
+                {['focus', 'history'].map((tab) => (
                     <button
                         key={tab}
                         onClick={() => setActiveTab(tab as any)}
@@ -138,7 +84,7 @@ export default function Home() {
                             activeTab === tab ? "bg-white shadow-sm text-primary" : "text-muted hover:text-text"
                         )}
                     >
-                        {tab === 'all' ? 'All Tasks' : tab}
+                        {tab}
                     </button>
                 ))}
             </div>
@@ -168,18 +114,40 @@ export default function Home() {
 
                             {isLoading ? (
                                 <div className="flex justify-center p-8"><Loader2 className="animate-spin text-primary" /></div>
-                            ) : focusTasks.length > 0 ? (
-                                <div className="space-y-3">
-                                    {focusTasks.map(task => (
-                                        <TaskCard key={task.id} task={task} />
-                                    ))}
-                                </div>
                             ) : (
-                                <Card>
-                                    <CardContent className="p-6 text-center text-muted">
-                                        No suggested tasks found. Add more tasks to your library!
-                                    </CardContent>
-                                </Card>
+                                <div className="space-y-6">
+                                    {/* Daily Routine Section */}
+                                    {dailyRoutineTasks.length > 0 && (
+                                        <div className="space-y-2">
+                                            <h3 className="text-xs font-semibold text-muted uppercase tracking-wider">Daily Routine</h3>
+                                            <div className="space-y-3">
+                                                {dailyRoutineTasks.map(task => (
+                                                    <TaskCard key={task.id} task={task} />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Suggested Focus Section */}
+                                    <div className="space-y-2">
+                                        <h3 className="text-xs font-semibold text-muted uppercase tracking-wider">Suggested Focus</h3>
+                                        {suggestedFocusTasks.length > 0 ? (
+                                            <div className="space-y-3">
+                                                {suggestedFocusTasks.map(task => (
+                                                    <TaskCard key={task.id} task={task} />
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <Card>
+                                                <CardContent className="p-6 text-center text-muted">
+                                                    No suggested tasks found for this energy level.
+                                                    <br />
+                                                    <span className="text-xs opacity-70">Try adding more tasks with matching effort levels!</span>
+                                                </CardContent>
+                                            </Card>
+                                        )}
+                                    </div>
+                                </div>
                             )}
                         </div>
                     ) : (
@@ -192,21 +160,6 @@ export default function Home() {
                         )
                     )}
                 </>
-            )}
-
-            {activeTab === 'all' && (
-                <div className="space-y-4">
-                    <h2 className="text-lg font-semibold">Active Tasks</h2>
-                    <div className="space-y-3">
-                        {allActiveTasks.length > 0 ? (
-                            allActiveTasks.map(task => (
-                                <TaskCard key={task.id} task={task} />
-                            ))
-                        ) : (
-                            <p className="text-muted text-center py-8">No active tasks.</p>
-                        )}
-                    </div>
-                </div>
             )}
 
             {activeTab === 'history' && (
@@ -241,6 +194,9 @@ export default function Home() {
             )}
 
             <FloatingActionButton onClick={() => setIsModalOpen(true)} />
+
+            {/* Empty State / Demo Data Button */}
+            {tasks.length === 0 && !isLoading && <EmptyLibrary />}
 
             <TaskCreationModal
                 isOpen={isModalOpen}
