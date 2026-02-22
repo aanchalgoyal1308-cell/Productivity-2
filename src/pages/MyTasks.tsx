@@ -36,8 +36,7 @@ export default function MyTasks() {
     let filteredTasks = tasks;
 
     if (filterMode === 'energy' && todayLog) {
-        filteredTasks = filterTasksByEnergy(tasks, todayLog.level);
-    } else if (filterMode === 'category' && selectedCategory !== 'All') {
+        filteredTasks = filterTasksByEnergy(tasks, todayLog.level).suggested;    } else if (filterMode === 'category' && selectedCategory !== 'All') {
         filteredTasks = tasks.filter(t => t.category === selectedCategory);
     }
 

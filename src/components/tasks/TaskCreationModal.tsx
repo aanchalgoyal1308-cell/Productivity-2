@@ -90,8 +90,8 @@ export function TaskCreationModal({ isOpen, onClose, taskToEdit }: TaskCreationM
                     due_date: data.due_date || null,
                     recurrence_type: data.recurrence_type,
                     recurrence_value: data.recurrence_type === 'custom' ? data.recurrence_days : undefined,
-                    // Default fields
                     tags: [],
+                    created_at: new Date().toISOString(),
                 });
             }
             reset();
