@@ -19,7 +19,7 @@ type TaskFormData = {
     description: string;
     category: TaskCategory;
     priority: Priority;
-    effort: string; // "3" | "5" | "8"
+    effort: number; // 1-10
     due_date: string;
     recurrence_type: RecurrenceType;
     recurrence_days: number[]; // 1-7
@@ -32,7 +32,7 @@ export function TaskCreationModal({ isOpen, onClose, taskToEdit }: TaskCreationM
         defaultValues: {
             category: 'Misc',
             priority: 'medium',
-            effort: '5',
+            effort: 5,
             recurrence_type: 'none',
             recurrence_days: [],
         }
@@ -45,7 +45,7 @@ export function TaskCreationModal({ isOpen, onClose, taskToEdit }: TaskCreationM
             setValue('description', taskToEdit.description || '');
             setValue('category', taskToEdit.category);
             setValue('priority', taskToEdit.priority);
-            setValue('effort', String(taskToEdit.effort));
+            setValue('effort', taskToEdit.effort);
             setValue('due_date', taskToEdit.due_date ? dayjs(taskToEdit.due_date).format('YYYY-MM-DD') : '');
             setValue('recurrence_type', taskToEdit.recurrence_type);
             setValue('recurrence_days', (taskToEdit.recurrence_value as number[]) || []);
@@ -75,7 +75,7 @@ export function TaskCreationModal({ isOpen, onClose, taskToEdit }: TaskCreationM
                     description: data.description || undefined,
                     category: data.category,
                     priority: data.priority,
-                    effort: parseInt(data.effort) as any,
+                    effort: data.effort,
                     due_date: data.due_date || null,
                     recurrence_type: data.recurrence_type,
                     recurrence_value: data.recurrence_type === 'custom' ? data.recurrence_days : undefined,
@@ -86,7 +86,7 @@ export function TaskCreationModal({ isOpen, onClose, taskToEdit }: TaskCreationM
                     description: data.description || undefined,
                     category: data.category,
                     priority: data.priority,
-                    effort: parseInt(data.effort) as any,
+                    effort: data.effort,
                     due_date: data.due_date || null,
                     recurrence_type: data.recurrence_type,
                     recurrence_value: data.recurrence_type === 'custom' ? data.recurrence_days : undefined,
@@ -167,28 +167,23 @@ export function TaskCreationModal({ isOpen, onClose, taskToEdit }: TaskCreationM
                     {/* Effort Selection */}
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-text">Effort Level</label>
-                        <div className="grid grid-cols-3 gap-3">
-                            {[
-                                { label: 'Easy', val: '3', color: 'bg-green-100 text-green-800 border-green-200' },
-                                { label: 'Medium', val: '5', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
-                                { label: 'Hard', val: '8', color: 'bg-red-100 text-red-800 border-red-200' }
-                            ].map((opt) => (
-                                <button
-                                    key={opt.val}
-                                    type="button"
-                                    onClick={() => setValue('effort', opt.val)}
-                                    className={cn(
-                                        "py-2 rounded-lg border text-sm font-medium transition-all",
-                                        effortValue === opt.val
-                                            ? `${opt.color} ring-2 ring-offset-1 ring-primary/20`
-                                            : "bg-surface border-muted/20 text-muted hover:bg-muted/5"
-                                    )}
-                                >
-                                    {opt.label}
-                                </button>
-                            ))}
+                        <div className="space-y-3">
+                            <input
+                                type="range"
+                                min="1"
+                                max="10"
+                                {...register('effort', { valueAsNumber: true })}
+                                className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer slider"
+                            />
+                            <div className="flex justify-between text-xs text-muted">
+                                <span>1 - Very Light</span>
+                                <span>5 - Moderate</span>
+                                <span>10 - Deep Work</span>
+                            </div>
+                            <div className="text-center text-sm font-medium text-primary">
+                                Current: {effortValue}
+                            </div>
                         </div>
-                        <input type="hidden" {...register('effort')} />
                     </div>
 
                     {/* Due Date & Recurrence */}

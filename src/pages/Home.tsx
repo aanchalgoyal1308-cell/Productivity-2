@@ -4,6 +4,7 @@ import { useTaskStore } from '../store/useTaskStore';
 import { useEnergyStore } from '../store/useEnergyStore';
 import { EnergySlider } from '../components/energy/EnergySlider';
 import { TaskCard } from '../components/tasks/TaskCard';
+import { CompactTaskCard } from '../components/tasks/CompactTaskCard';
 import { FloatingActionButton } from '../components/ui/FloatingActionButton';
 import { TaskCreationModal } from '../components/tasks/TaskCreationModal';
 import { Card, CardContent } from '../components/ui/Card';
@@ -122,7 +123,7 @@ export default function Home() {
                                             <h3 className="text-xs font-semibold text-muted uppercase tracking-wider">Daily Routine</h3>
                                             <div className="space-y-3">
                                                 {dailyRoutineTasks.map(task => (
-                                                    <TaskCard key={task.id} task={task} />
+                                                    <CompactTaskCard key={task.id} task={task} />
                                                 ))}
                                             </div>
                                         </div>
@@ -134,7 +135,7 @@ export default function Home() {
                                         {suggestedFocusTasks.length > 0 ? (
                                             <div className="space-y-3">
                                                 {suggestedFocusTasks.map(task => (
-                                                    <TaskCard key={task.id} task={task} />
+                                                    <CompactTaskCard key={task.id} task={task} />
                                                 ))}
                                             </div>
                                         ) : (
@@ -184,7 +185,7 @@ export default function Home() {
                     <div className="space-y-3">
                         {historyTasks.length > 0 ? (
                             historyTasks.map(task => (
-                                <TaskCard key={task.id} task={task} />
+                                <CompactTaskCard key={task.id} task={task} />
                             ))
                         ) : (
                             <p className="text-muted text-center py-8">No completed tasks in this period.</p>

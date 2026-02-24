@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useEnergyStore } from '../../store/useEnergyStore';
+import { useTaskStore } from '../../store/useTaskStore';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Zap } from 'lucide-react';
@@ -7,6 +8,7 @@ import { cn } from '../../utils/cn';
 
 export function EnergySlider() {
     const { todayLog, logEnergy, isLoading } = useEnergyStore();
+    const { tasks, seedDefaults } = useTaskStore();
     const [value, setValue] = useState(todayLog?.level || 5);
     const [submitted, setSubmitted] = useState(false);
 
@@ -30,6 +32,10 @@ export function EnergySlider() {
 
     const handleLog = async () => {
         await logEnergy(value);
+        // Auto-seed if library is empty
+        if (tasks.length === 0) {
+            await seedDefaults();
+        }
         setSubmitted(true);
     };
 

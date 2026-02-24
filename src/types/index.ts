@@ -20,7 +20,7 @@ export interface Task {
     id: string;
     user_id: string;
     title: string;
-    description?: string;
+    description: string;
     priority: Priority;
     effort: EnergyLevel;
     due_date?: string | null; // ISO 8601
