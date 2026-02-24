@@ -5,11 +5,11 @@ export function AuthLayout() {
         <div className="min-h-screen flex items-center justify-center bg-background p-4">
             <div className="w-full max-w-sm space-y-6">
                 <div className="flex flex-col items-center space-y-2 text-center">
-                    <h1 className="text-3xl font-bold tracking-tighter text-primary">
-                        ClarityFlow
+                    <h1 className="text-5xl font-bold tracking-tighter text-primary">
+                        MOOD
                     </h1>
                     <p className="text-muted text-sm">
-                        Focus on what matters, when you have the energy.
+                        Moments Of Organized Doing
                     </p>
                 </div>
                 <Outlet />
