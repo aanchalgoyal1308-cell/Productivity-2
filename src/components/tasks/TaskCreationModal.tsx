@@ -4,8 +4,7 @@ import { useForm } from 'react-hook-form';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { useTaskStore } from '../../store/useTaskStore';
-import type { TaskCategory, RecurrenceType, Priority, Task } from '../../types';
-import { cn } from '../../utils/cn';
+import type { TaskCategory, RecurrenceType, Priority, Task, EnergyLevel } from '../../types';
 import dayjs from 'dayjs';
 
 interface TaskCreationModalProps {
@@ -72,10 +71,10 @@ export function TaskCreationModal({ isOpen, onClose, taskToEdit }: TaskCreationM
             if (taskToEdit) {
                 await updateTask(taskToEdit.id, {
                     title: data.title,
-                    description: data.description || undefined,
+                    description: data.description,
                     category: data.category,
                     priority: data.priority,
-                    effort: data.effort,
+                    effort: data.effort as EnergyLevel,
                     due_date: data.due_date || null,
                     recurrence_type: data.recurrence_type,
                     recurrence_value: data.recurrence_type === 'custom' ? data.recurrence_days : undefined,
@@ -83,10 +82,10 @@ export function TaskCreationModal({ isOpen, onClose, taskToEdit }: TaskCreationM
             } else {
                 await addTask({
                     title: data.title,
-                    description: data.description || undefined,
+                    description: data.description,
                     category: data.category,
                     priority: data.priority,
-                    effort: data.effort,
+                    effort: data.effort as EnergyLevel,
                     due_date: data.due_date || null,
                     recurrence_type: data.recurrence_type,
                     recurrence_value: data.recurrence_type === 'custom' ? data.recurrence_days : undefined,

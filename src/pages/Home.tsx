@@ -3,7 +3,6 @@ import { cn } from '../utils/cn';
 import { useTaskStore } from '../store/useTaskStore';
 import { useEnergyStore } from '../store/useEnergyStore';
 import { EnergySlider } from '../components/energy/EnergySlider';
-import { TaskCard } from '../components/tasks/TaskCard';
 import { CompactTaskCard } from '../components/tasks/CompactTaskCard';
 import { FloatingActionButton } from '../components/ui/FloatingActionButton';
 import { TaskCreationModal } from '../components/tasks/TaskCreationModal';
