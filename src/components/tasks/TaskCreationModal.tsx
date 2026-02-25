@@ -18,7 +18,7 @@ type TaskFormData = {
     description: string;
     category: TaskCategory;
     priority: Priority;
-    effort: number; // 1-10
+    effort: number; // 1-5
     due_date: string;
     recurrence_type: RecurrenceType;
     recurrence_days: number[]; // 1-7
@@ -170,14 +170,14 @@ export function TaskCreationModal({ isOpen, onClose, taskToEdit }: TaskCreationM
                             <input
                                 type="range"
                                 min="1"
-                                max="10"
+                                max="5"
                                 {...register('effort', { valueAsNumber: true })}
                                 className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer slider"
                             />
                             <div className="flex justify-between text-xs text-muted">
                                 <span>1 - Very Light</span>
-                                <span>5 - Moderate</span>
-                                <span>10 - Deep Work</span>
+                                <span>3 - Moderate</span>
+                                <span>5 - Deep Work</span>
                             </div>
                             <div className="text-center text-sm font-medium text-primary">
                                 Current: {effortValue}

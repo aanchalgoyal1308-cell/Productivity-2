@@ -15,14 +15,13 @@ export interface TaskAssignmentResult {
 
 // STEP 1: Compute numeric budget
 function computeBudget(userEnergy: EnergyLevel): number {
-    const budget = Math.round(userEnergy * 1.5);
+    const budget = Math.round(userEnergy * 3);
     return Math.max(budget, userEnergy);
 }
 
 // STEP 2: Compute soft task cap
 function computeMaxTasks(userEnergy: EnergyLevel): number {
-    const softCap = Math.round(userEnergy / 2);
-    return Math.min(softCap, 5);
+    return Math.min(userEnergy, 5);
 }
 
 // STEP 3: Priority weighting
@@ -92,7 +91,7 @@ function assignInitialGuarantees(
     if (highPriorityTasks.length > 0) {
         const task = highPriorityTasks[0];
         const cost = computeAdjustedCost(task);
-        const costThreshold = userEnergy >= 8 ? budget : budget * 0.7;
+        const costThreshold = userEnergy >= 4 ? budget : budget * 0.7;
 
         if (cost <= remainingBudget && cost <= costThreshold) {
             assigned.push(task);
@@ -145,7 +144,7 @@ function assignMainLoop(
         const cost = computeAdjustedCost(task);
 
         // Prevent large task domination
-        if (cost > budget * 0.7 && userEnergy < 8) {
+        if (cost > budget * 0.7 && userEnergy < 4) {
             continue;
         }
 
@@ -177,6 +176,8 @@ export function assignTasks(userEnergy: EnergyLevel, tasks: Task[]): TaskAssignm
     const candidates = tasks.filter(
         t => !t.is_completed && t.recurrence_type !== 'daily'
     );
+
+    console.log(`[assignTasks] Candidates: ${candidates.length}`);
 
     // Compute numeric constraints
     const budget = computeBudget(userEnergy);

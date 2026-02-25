@@ -22,7 +22,7 @@ export function EnergySlider() {
                             <Zap className="w-5 h-5 fill-current" />
                             Energy Logged
                         </h3>
-                        <p className="text-2xl font-bold mt-1 text-primary">{todayLog.level}/10</p>
+                        <p className="text-2xl font-bold mt-1 text-primary">{todayLog.level}/5</p>
                     </div>
                     <p className="text-sm text-muted italic">Great job checking in!</p>
                 </CardContent>
@@ -51,21 +51,23 @@ export function EnergySlider() {
                 <div className="text-center">
                     <span className={cn(
                         "text-4xl font-bold transition-colors",
-                        value <= 3 ? "text-red-500" : value <= 7 ? "text-yellow-500" : "text-green-500"
+                        value <= 2 ? "text-red-500" : value === 3 ? "text-yellow-500" : "text-green-500"
                     )}>
                         {value}
                     </span>
                     <p className="text-sm text-muted mt-1">
-                        {value <= 3 ? "Low Energy - Focus on small wins" :
-                            value <= 7 ? "Balanced - Good for steady work" :
-                                "High Energy - Tackle big projects!"}
+                        {value === 1 ? "Very Light - Quick tasks only" :
+                            value === 2 ? "Light - Small wins" :
+                            value === 3 ? "Balanced - Steady work" :
+                            value === 4 ? "Energetic - Good progress" :
+                                "Deep Work - Big projects!"}
                     </p>
                 </div>
 
                 <input
                     type="range"
                     min="1"
-                    max="10"
+                    max="5"
                     value={value}
                     onChange={(e) => setValue(Number(e.target.value) as any)}
                     className="w-full h-2 bg-muted/30 rounded-lg appearance-none cursor-pointer accent-primary"

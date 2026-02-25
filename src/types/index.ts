@@ -1,5 +1,5 @@
 export type Priority = 'low' | 'medium' | 'high';
-export type EnergyLevel = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+export type EnergyLevel = 1 | 2 | 3 | 4 | 5;
 export type TaskCategory = 'Personal' | 'Digital' | 'Relationships' | 'Professional' | 'Misc';
 export type RecurrenceType = 'none' | 'daily' | 'weekly' | 'monthly' | 'custom';
 
@@ -49,4 +49,13 @@ export interface Project {
     name: string;
     color?: string;
     created_at: string;
+}
+
+// Deterministic compression from 1-10 to 1-5 scale
+export function compressToFiveScale(oldEnergy: number): EnergyLevel {
+    if (oldEnergy <= 2) return 1;
+    if (oldEnergy <= 4) return 2;
+    if (oldEnergy <= 6) return 3;
+    if (oldEnergy <= 8) return 4;
+    return 5;
 }
