@@ -1,77 +1,61 @@
 import type { Task, EnergyLevel } from '../types';
 
-export interface TaskSelectionResult {
-    tasks: Task[];
-    daily: Task[];
-    suggested: Task[];
+export interface AssignmentMetrics {
+    userEnergy: EnergyLevel;
+    budget: number;
+    maxTasks: number;
+    assignedCount: number;
+    totalCost: number;
 }
 
-// Configuration for targets based on Energy Level
-const ENERGY_TARGETS: Record<number, { easy: number; medium: number; hard: number }> = {
-    1: { easy: 0, medium: 0, hard: 0 },
-    2: { easy: 0, medium: 0, hard: 0 },
-    3: { easy: 0, medium: 0, hard: 0 },
-    4: { easy: 2, medium: 1, hard: 0 },
-    5: { easy: 1, medium: 2, hard: 0 },
-    6: { easy: 0, medium: 1, hard: 1 },
-    7: { easy: 0, medium: 2, hard: 1 },
-    8: { easy: 0, medium: 2, hard: 2 },
-    9: { easy: 0, medium: 2, hard: 2 },
-    10: { easy: 0, medium: 1, hard: 3 },
-};
-
-// Get task distribution for an energy level
-export function getTaskDistribution(energy: EnergyLevel): { easy: number; medium: number; hard: number } {
-    return ENERGY_TARGETS[energy] || { easy: 0, medium: 0, hard: 0 };
+export interface TaskAssignmentResult {
+    assigned: Task[];
+    metrics: AssignmentMetrics;
 }
 
-// Main function
-export function filterTasksByEnergy(tasks: Task[], energyLevel: EnergyLevel): TaskSelectionResult {
-    // 1. Active tasks
-    const allActive = tasks.filter(t => !t.is_completed);
+// STEP 1: Compute numeric budget
+function computeBudget(userEnergy: EnergyLevel): number {
+    const budget = Math.round(userEnergy * 1.5);
+    return Math.max(budget, userEnergy);
+}
 
-    // 2. Separate daily tasks (with effort <= energyLevel)
-    const daily = allActive.filter(t => t.recurrence_type === 'daily' && t.effort <= energyLevel);
-    const sortedDaily = sortTasks(daily).slice(0, 3);
+// STEP 2: Compute soft task cap
+function computeMaxTasks(userEnergy: EnergyLevel): number {
+    const softCap = Math.round(userEnergy / 2);
+    return Math.min(softCap, 5);
+}
 
-    // 3. Pool for suggested: non-daily, effort <= energyLevel
-    const pool = allActive.filter(t => t.recurrence_type !== 'daily' && t.effort <= energyLevel);
-
-    // 3. Classify by effort (Easy 1-3, Medium 4-7, Hard 8-10)
-    const easyTasks = pool.filter(t => t.effort >= 1 && t.effort <= 3);
-    const mediumTasks = pool.filter(t => t.effort >= 4 && t.effort <= 7);
-    const hardTasks = pool.filter(t => t.effort >= 8 && t.effort <= 10);
-
-    // 4. Sort each pool by priority desc, due date asc (null last), effort asc
-    const sortedEasy = sortTasks(easyTasks);
-    const sortedMedium = sortTasks(mediumTasks);
-    const sortedHard = sortTasks(hardTasks);
-
-    // 5. Determine targets
-    const targets = ENERGY_TARGETS[energyLevel] || { easy: 0, medium: 0, hard: 0 };
-
-    // 6. Selection (no fallback, exact quota)
-    const selected: Task[] = [];
-
-    // Easy
-    selected.push(...sortedEasy.slice(0, targets.easy));
-
-    // Medium
-    selected.push(...sortedMedium.slice(0, targets.medium));
-
-    // Hard
-    selected.push(...sortedHard.slice(0, targets.hard));
-
-    console.log(`[filterTasksByEnergy] Energy ${energyLevel}: Daily ${sortedDaily.length}, Suggested ${selected.length} (${targets.easy} easy, ${targets.medium} medium, ${targets.hard} hard)`);
-
-    return {
-        tasks: allActive,
-        daily: sortedDaily,
-        suggested: selected,
+// STEP 3: Priority weighting
+function getPriorityWeight(priority: string): number {
+    const weights: Record<string, number> = {
+        high: 0.8,
+        medium: 1.0,
+        low: 1.2,
     };
+    return weights[priority] || 1.0;
 }
 
-// Helper: Sort tasks by priority desc, due date asc (null last), effort asc
+// STEP 4: Compute adjusted cost (with aging boost)
+function computeAdjustedCost(task: Task): number {
+    const priorityWeight = getPriorityWeight(task.priority);
+    let adjustedCost = task.effort * priorityWeight;
+
+    // Apply aging boost (anti-starvation)
+    if (task.created_at) {
+        const now = new Date();
+        const createdDate = new Date(task.created_at);
+        const daysSinceCreation = (now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24);
+
+        // If task hasn't been assigned in >= 5 days, reduce cost by 10%
+        if (daysSinceCreation >= 5) {
+            adjustedCost = adjustedCost * 0.9;
+        }
+    }
+
+    return adjustedCost;
+}
+
+// STEP 6: Sort tasks by priority, due date, effort
 function sortTasks(list: Task[]): Task[] {
     return list.sort((a, b) => {
         // Priority desc: high > medium > low
@@ -90,4 +74,182 @@ function sortTasks(list: Task[]): Task[] {
         // Effort asc
         return a.effort - b.effort;
     });
+}
+
+// STEP 7: Assign initial guarantees (psychological balance)
+function assignInitialGuarantees(
+    candidates: Task[],
+    budget: number,
+    maxTasks: number,
+    userEnergy: EnergyLevel
+): { assigned: Task[]; remainingBudget: number; remainingCandidates: Task[] } {
+    const assigned: Task[] = [];
+    let remainingBudget = budget;
+    const usedIds = new Set<string>();
+
+    // A) Assign highest priority task first
+    const highPriorityTasks = candidates.filter(t => t.priority === 'high');
+    if (highPriorityTasks.length > 0) {
+        const task = highPriorityTasks[0];
+        const cost = computeAdjustedCost(task);
+        const costThreshold = userEnergy >= 8 ? budget : budget * 0.7;
+
+        if (cost <= remainingBudget && cost <= costThreshold) {
+            assigned.push(task);
+            remainingBudget -= cost;
+            usedIds.add(task.id);
+        }
+    }
+
+    // B) Assign low-energy quick-win task (energyLevel <= 3)
+    if (assigned.length < maxTasks) {
+        const quickWinCandidates = candidates.filter(
+            t => t.effort <= 3 && !usedIds.has(t.id) && t.priority !== 'high'
+        );
+        if (quickWinCandidates.length > 0) {
+            const task = sortTasks(quickWinCandidates)[0];
+            const cost = computeAdjustedCost(task);
+
+            if (cost <= remainingBudget) {
+                assigned.push(task);
+                remainingBudget -= cost;
+                usedIds.add(task.id);
+            }
+        }
+    }
+
+    const remainingCandidates = candidates.filter(t => !usedIds.has(t.id));
+
+    return { assigned, remainingBudget, remainingCandidates };
+}
+
+// STEP 8 & 9: Main assignment loop with fallback
+function assignMainLoop(
+    candidates: Task[],
+    initialAssigned: Task[],
+    budget: number,
+    maxTasks: number,
+    userEnergy: EnergyLevel
+): Task[] {
+    let assigned = [...initialAssigned];
+    let remainingBudget = budget - initialAssigned.reduce((sum, t) => sum + computeAdjustedCost(t), 0);
+    const usedIds = new Set(assigned.map(t => t.id));
+
+    const sorted = sortTasks(candidates);
+
+    // Main loop: assign tasks while budget and task cap allow
+    for (const task of sorted) {
+        if (assigned.length >= maxTasks) break;
+        if (usedIds.has(task.id)) continue;
+
+        const cost = computeAdjustedCost(task);
+
+        // Prevent large task domination
+        if (cost > budget * 0.7 && userEnergy < 8) {
+            continue;
+        }
+
+        // Check budget and cap constraints
+        if (cost <= remainingBudget && assigned.length < maxTasks) {
+            assigned.push(task);
+            remainingBudget -= cost;
+            usedIds.add(task.id);
+        }
+    }
+
+    // STEP 9: Fallback rule (ensure at least one meaningful task)
+    if (assigned.length === 0) {
+        const fallbackCandidates = candidates
+            .filter(t => t.priority === 'high' && t.effort <= userEnergy + 1)
+            .sort((a, b) => a.effort - b.effort);
+
+        if (fallbackCandidates.length > 0) {
+            assigned.push(fallbackCandidates[0]);
+        }
+    }
+
+    return assigned;
+}
+
+// MAIN EXPORT: assignTasks function
+export function assignTasks(userEnergy: EnergyLevel, tasks: Task[]): TaskAssignmentResult {
+    // STEP 5: Pre-filter (exclude completed and daily tasks)
+    const candidates = tasks.filter(
+        t => !t.is_completed && t.recurrence_type !== 'daily'
+    );
+
+    // Compute numeric constraints
+    const budget = computeBudget(userEnergy);
+    const maxTasks = computeMaxTasks(userEnergy);
+
+    // STEP 6: Sort candidates
+    const sortedCandidates = sortTasks(candidates);
+
+    // STEP 7: Assign initial guarantees
+    const { assigned: initialAssigned, remainingCandidates } = assignInitialGuarantees(
+        sortedCandidates,
+        budget,
+        maxTasks,
+        userEnergy
+    );
+
+    // STEP 8 & 9: Main loop with fallback
+    const finalAssigned = assignMainLoop(
+        remainingCandidates,
+        initialAssigned,
+        budget,
+        maxTasks,
+        userEnergy
+    );
+
+    // Calculate metrics
+    const totalCost = finalAssigned.reduce((sum, t) => sum + computeAdjustedCost(t), 0);
+
+    const metrics: AssignmentMetrics = {
+        userEnergy,
+        budget,
+        maxTasks,
+        assignedCount: finalAssigned.length,
+        totalCost: Math.round(totalCost * 100) / 100,
+    };
+
+    console.log(`[assignTasks] Energy ${userEnergy}: Budget ${budget}, MaxTasks ${maxTasks}, Assigned ${finalAssigned.length}, TotalCost ${metrics.totalCost}`);
+
+    return {
+        assigned: finalAssigned,
+        metrics,
+    };
+}
+
+export interface TaskSelectionResult {
+    tasks: Task[];
+    daily: Task[];
+    suggested: Task[];
+}
+
+export function filterTasksByEnergy(tasks: Task[], energyLevel: EnergyLevel): TaskSelectionResult {
+    // Get all active tasks
+    const allActive = tasks.filter(t => !t.is_completed);
+
+    // Separate daily tasks (always show, limited to 3)
+    const daily = allActive.filter(t => t.recurrence_type === 'daily');
+    const sortedDaily = sortTasks(daily).slice(0, 3);
+
+    // Use new assignment logic for suggested tasks
+    const result = assignTasks(energyLevel, tasks);
+    const suggested = result.assigned;
+
+    return {
+        tasks: allActive,
+        daily: sortedDaily,
+        suggested,
+    };
+}
+
+// Legacy function for distribution info
+export function getTaskDistribution(energy: EnergyLevel): { budget: number; maxTasks: number } {
+    return {
+        budget: computeBudget(energy),
+        maxTasks: computeMaxTasks(energy),
+    };
 }
